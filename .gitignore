@@ -1,3 +1,4 @@
+
 *.pydevproject
 .project
 .metadata
@@ -18,3 +19,9 @@ local.properties
 
 /org.ektorp.spring/target/
 /target
+*.class
+
+# Package Files #
+*.jar
+*.war
+*.ear
