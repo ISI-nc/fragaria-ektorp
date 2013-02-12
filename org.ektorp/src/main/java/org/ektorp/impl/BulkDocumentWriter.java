@@ -1,17 +1,26 @@
 package org.ektorp.impl;
 
-import java.io.*;
-import java.util.*;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.SequenceInputStream;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 
-import org.apache.commons.io.*;
+import org.apache.commons.io.IOUtils;
+import org.ektorp.util.Exceptions;
+
 import com.fasterxml.jackson.core.JsonEncoding;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.ektorp.util.*;
+
 /**
- *
+ * 
  * @author henrik lundgren
- *
+ * 
  */
 public class BulkDocumentWriter {
 
@@ -20,16 +29,20 @@ public class BulkDocumentWriter {
 	public BulkDocumentWriter(ObjectMapper om) {
 		objectMapper = om;
 	}
+
 	/**
-	 * Writes the objects collection as a bulk operation document.
-	 * The output stream is flushed and closed by this method.
+	 * Writes the objects collection as a bulk operation document. The output
+	 * stream is flushed and closed by this method.
+	 * 
 	 * @param objects
 	 * @param allOrNothing
 	 * @param out
 	 */
-	public void write(Collection<?> objects, boolean allOrNothing, OutputStream out) {
+	public void write(Collection<?> objects, boolean allOrNothing,
+			OutputStream out) {
 		try {
-			JsonGenerator jg = objectMapper.getJsonFactory().createJsonGenerator(out, JsonEncoding.UTF8);
+			JsonGenerator jg = objectMapper.getJsonFactory()
+					.createJsonGenerator(out, JsonEncoding.UTF8);
 			jg.writeStartObject();
 			if (allOrNothing) {
 				jg.writeBooleanField("all_or_nothing", true);
@@ -49,30 +62,35 @@ public class BulkDocumentWriter {
 		}
 	}
 
-	public InputStream createInputStreamWrapper(boolean allOrNothing, InputStream in) {
-	    List<InputStream> seq = new ArrayList<InputStream>(3);
+	public InputStream createInputStreamWrapper(boolean allOrNothing,
+			InputStream in) {
+		List<InputStream> seq = new ArrayList<InputStream>(3);
 
-        try {
-            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-            JsonGenerator jg = objectMapper.getJsonFactory().createJsonGenerator(byteArrayOutputStream, JsonEncoding.UTF8);
-            jg.writeStartObject();
-            if (allOrNothing) {
-                jg.writeBooleanField("all_or_nothing", true);
-            }
-            jg.writeFieldName("docs");
-            jg.writeRaw(':');
-            jg.flush();
-            seq.add(new ByteArrayInputStream(byteArrayOutputStream.toByteArray()));
-            seq.add(in);
-            byteArrayOutputStream.reset();
-            jg.writeEndObject();
-            jg.flush();
-            jg.close();
-            seq.add(new ByteArrayInputStream(byteArrayOutputStream.toByteArray()));
-        } catch (Exception e) {
-            throw Exceptions.propagate(e);
-        }
-        return new SequenceInputStream(Collections.enumeration(seq));
-    }
+		try {
+			ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+			JsonGenerator jg = objectMapper.getJsonFactory()
+					.createJsonGenerator(byteArrayOutputStream,
+							JsonEncoding.UTF8);
+			jg.writeStartObject();
+			if (allOrNothing) {
+				jg.writeBooleanField("all_or_nothing", true);
+			}
+			jg.writeFieldName("docs");
+			jg.writeRaw(':');
+			jg.flush();
+			seq.add(new ByteArrayInputStream(byteArrayOutputStream
+					.toByteArray()));
+			seq.add(in);
+			byteArrayOutputStream.reset();
+			jg.writeEndObject();
+			jg.flush();
+			jg.close();
+			seq.add(new ByteArrayInputStream(byteArrayOutputStream
+					.toByteArray()));
+		} catch (Exception e) {
+			throw Exceptions.propagate(e);
+		}
+		return new SequenceInputStream(Collections.enumeration(seq));
+	}
 
 }
