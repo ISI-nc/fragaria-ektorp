@@ -58,7 +58,8 @@ public class StdHttpClient implements HttpClient {
 	public StdHttpClient(org.apache.http.client.HttpClient hc) {
 		this(hc, hc);
 	}
-	public StdHttpClient(org.apache.http.client.HttpClient hc, 
+
+	public StdHttpClient(org.apache.http.client.HttpClient hc,
 			org.apache.http.client.HttpClient backend) {
 		this.client = hc;
 		this.backend = backend;
@@ -132,31 +133,50 @@ public class StdHttpClient implements HttpClient {
 		}
 	}
 
-
-
-	private HttpResponse executeRequest(HttpRequestBase request, Map<String, String> headers) {
-		for(Map.Entry<String, String> header : headers.entrySet()) {
+	private HttpResponse executeRequest(HttpRequestBase request,
+			Map<String, String> headers) {
+		for (Map.Entry<String, String> header : headers.entrySet()) {
 			request.setHeader(header.getKey(), header.getValue());
 		}
 		return executeRequest(request);
 	}
 
-	private HttpResponse executeRequest(HttpUriRequest request, boolean useBackend) {
+	private HttpResponse executeRequest(HttpUriRequest request,
+			boolean useBackend) {
+		return executeRequest(request, useBackend, 1);
+	}
+
+	private HttpResponse executeRequest(HttpUriRequest request,
+			boolean useBackend, int retry) {
+		int maxRetry = 10;
+		int wait = 60000;
 		try {
 			org.apache.http.HttpResponse rsp;
 			if (useBackend) {
 				rsp = backend.execute(request);
 			} else {
-				rsp = client.execute((HttpHost)client.getParams().getParameter(ClientPNames.DEFAULT_HOST), request);				
+				rsp = client.execute((HttpHost) client.getParams()
+						.getParameter(ClientPNames.DEFAULT_HOST), request);
 			}
-			LOG.trace("{} {} {} {}", new Object[] { request.getMethod(), request.getURI(),
-					rsp.getStatusLine().getStatusCode(), rsp.getStatusLine().getReasonPhrase() });
+			LOG.trace("{} {} {} {}", new Object[] { request.getMethod(),
+					request.getURI(), rsp.getStatusLine().getStatusCode(),
+					rsp.getStatusLine().getReasonPhrase() });
 			return StdHttpResponse.of(rsp, request);
 		} catch (Exception e) {
-			throw Exceptions.propagate(e);
-		}		
+			if (retry <= maxRetry) {
+				try {
+					System.out.println("ERROR :: connection error. Retrying "+retry+"/"+maxRetry+" in "+wait/1000+" seconds.");					
+					Thread.sleep(wait);
+					return executeRequest(request, useBackend, maxRetry++);
+				} catch (InterruptedException e2) {
+					// TODO Auto-generated catch block
+					throw Exceptions.propagate(e2);
+				}
+			} else
+				throw Exceptions.propagate(e);
+		}
 	}
-	
+
 	private HttpResponse executeRequest(HttpRequestBase request) {
 		return executeRequest(request, false);
 	}
@@ -165,7 +185,7 @@ public class StdHttpClient implements HttpClient {
 	public HttpResponse copy(String sourceUri, String destination) {
 		return executeRequest(new HttpCopyRequest(sourceUri, destination), true);
 	}
-	
+
 	public void shutdown() {
 		client.getConnectionManager().shutdown();
 	}
@@ -195,16 +215,20 @@ public class StdHttpClient implements HttpClient {
 		int maxCacheEntries = 1000;
 
 		public Builder url(String s) throws MalformedURLException {
-			if (s == null) return this;
+			if (s == null)
+				return this;
 			return this.url(new URL(s));
 		}
+
 		/**
-		 * Will set host, port and possible enables SSL based on the properties if the supplied URL.
-		 * This method overrides the properties: host, port and enableSSL. 
+		 * Will set host, port and possible enables SSL based on the properties
+		 * if the supplied URL. This method overrides the properties: host, port
+		 * and enableSSL.
+		 * 
 		 * @param url
 		 * @return
 		 */
-		public Builder url(URL url){
+		public Builder url(URL url) {
 			this.host = url.getHost();
 			this.port = url.getPort();
 			if (url.getUserInfo() != null) {
@@ -224,7 +248,7 @@ public class StdHttpClient implements HttpClient {
 			}
 			return this;
 		}
-		
+
 		public Builder host(String s) {
 			host = s;
 			return this;
@@ -239,7 +263,7 @@ public class StdHttpClient implements HttpClient {
 			proxy = s;
 			return this;
 		}
-		
+
 		/**
 		 * Controls if the http client should send Accept-Encoding: gzip,deflate
 		 * header and handle Content-Encoding responses. This enable compression
@@ -252,13 +276,15 @@ public class StdHttpClient implements HttpClient {
 		 * @param b
 		 * @return This builder
 		 */
-		public Builder compression(boolean b){
+		public Builder compression(boolean b) {
 			compression = b;
 			return this;
 		}
+
 		/**
-		 * Controls if the http client should cache response entities.
-		 * Default is true.
+		 * Controls if the http client should cache response entities. Default
+		 * is true.
+		 * 
 		 * @param b
 		 * @return
 		 */
@@ -266,11 +292,12 @@ public class StdHttpClient implements HttpClient {
 			caching = b;
 			return this;
 		}
-		
+
 		public Builder maxCacheEntries(int m) {
 			maxCacheEntries = m;
 			return this;
 		}
+
 		public Builder maxObjectSizeBytes(int m) {
 			maxObjectSizeBytes = m;
 			return this;
@@ -282,7 +309,8 @@ public class StdHttpClient implements HttpClient {
 				SchemeRegistry schemeRegistry = new SchemeRegistry();
 				schemeRegistry.register(configureScheme());
 
-				PoolingClientConnectionManager cm = new PoolingClientConnectionManager(schemeRegistry);
+				PoolingClientConnectionManager cm = new PoolingClientConnectionManager(
+						schemeRegistry);
 				cm.setMaxTotal(maxConnections);
 				cm.setDefaultMaxPerRoute(maxConnections);
 				conman = cm;
@@ -322,15 +350,19 @@ public class StdHttpClient implements HttpClient {
 							context.init(null, null, null);
 						}
 
-						sslSocketFactory = relaxedSSLSettings ? new SSLSocketFactory(context, SSLSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER) : new SSLSocketFactory(context);
+						sslSocketFactory = relaxedSSLSettings ? new SSLSocketFactory(
+								context,
+								SSLSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER)
+								: new SSLSocketFactory(context);
 
 					}
 					return new Scheme("https", port, sslSocketFactory);
-                } catch (Exception e) {
+				} catch (Exception e) {
 					throw Exceptions.propagate(e);
 				}
 			} else {
-				return new Scheme("http", port, PlainSocketFactory.getSocketFactory());
+				return new Scheme("http", port,
+						PlainSocketFactory.getSocketFactory());
 			}
 		}
 
@@ -342,10 +374,10 @@ public class StdHttpClient implements HttpClient {
 			HttpConnectionParams.setSoTimeout(params, socketTimeout);
 			HttpConnectionParams.setTcpNoDelay(params, Boolean.TRUE);
 
-            String protocol = "http";
+			String protocol = "http";
 
 			if (enableSSL)
-                protocol = "https";
+				protocol = "https";
 
 			params.setParameter(ClientPNames.DEFAULT_HOST, new HttpHost(host,
 					port, protocol));
@@ -354,7 +386,8 @@ public class StdHttpClient implements HttpClient {
 						new HttpHost(proxy, proxyPort, protocol));
 			}
 			ClientConnectionManager connectionManager = configureConnectionManager(params);
-			DefaultHttpClient client = new DefaultHttpClient(connectionManager, params);
+			DefaultHttpClient client = new DefaultHttpClient(connectionManager,
+					params);
 			if (username != null && password != null) {
 				client.getCredentialsProvider().setCredentials(
 						new AuthScope(host, port, AuthScope.ANY_REALM),
@@ -362,7 +395,7 @@ public class StdHttpClient implements HttpClient {
 				client.addRequestInterceptor(
 						new PreemptiveAuthRequestInterceptor(), 0);
 			}
-			
+
 			if (compression) {
 				return new DecompressingHttpClient(client);
 			}
@@ -462,9 +495,9 @@ public class StdHttpClient implements HttpClient {
 		}
 
 		/**
-		 * Activates 'Expect: 100-Continue' handshake with CouchDB.
-		 * Using expect continue can reduce stale connection problems for PUT / POST operations.
-		 * body. Enabled by default.
+		 * Activates 'Expect: 100-Continue' handshake with CouchDB. Using expect
+		 * continue can reduce stale connection problems for PUT / POST
+		 * operations. body. Enabled by default.
 		 * 
 		 * @param b
 		 * @return
@@ -479,17 +512,21 @@ public class StdHttpClient implements HttpClient {
 			org.apache.http.client.HttpClient cachingHttpClient = client;
 
 			if (caching) {
-				cachingHttpClient = WithCachingBuilder.withCaching(client, maxCacheEntries, maxObjectSizeBytes);
+				cachingHttpClient = WithCachingBuilder.withCaching(client,
+						maxCacheEntries, maxObjectSizeBytes);
 			}
 			return new StdHttpClient(cachingHttpClient, client);
 		}
 
 	}
 
-        // separate class to avoid runtime dependency to httpclient-cache unless using caching
+	// separate class to avoid runtime dependency to httpclient-cache unless
+	// using caching
 	private static class WithCachingBuilder {
-		public static org.apache.http.client.HttpClient withCaching(org.apache.http.client.HttpClient client, int maxCacheEntries, int maxObjectSizeBytes) {
-			CacheConfig cacheConfig = new CacheConfig();  
+		public static org.apache.http.client.HttpClient withCaching(
+				org.apache.http.client.HttpClient client, int maxCacheEntries,
+				int maxObjectSizeBytes) {
+			CacheConfig cacheConfig = new CacheConfig();
 			cacheConfig.setMaxCacheEntries(maxCacheEntries);
 			cacheConfig.setMaxObjectSizeBytes(maxObjectSizeBytes);
 			return new CachingHttpClient(client, cacheConfig);

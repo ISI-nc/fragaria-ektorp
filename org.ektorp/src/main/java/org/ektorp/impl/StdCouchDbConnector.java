@@ -686,6 +686,12 @@ public class StdCouchDbConnector implements CouchDbConnector {
 
 	private List<DocumentOperationResult> executeBulk(Collection<?> objects,
 			boolean allOrNothing) {
+		return this.executeBulk(objects, allOrNothing, 1);
+	}
+
+	private List<DocumentOperationResult> executeBulk(Collection<?> objects,
+			boolean allOrNothing, int retry) {
+		int maxRetry = 10;
 		BulkOperation op = jsonSerializer.createBulkOperation(objects,
 				allOrNothing);
 		try {
@@ -694,9 +700,17 @@ public class StdCouchDbConnector implements CouchDbConnector {
 					new BulkOperationResponseHandler(objects, objectMapper));
 			op.awaitCompletion();
 			return result;
+		} catch (Exception e) {
+			if (retry <= maxRetry) {
+				System.out
+						.println("ERROR :: connecting to couchdb database. Retrying "
+								+ retry + "/" + maxRetry);
+				return executeBulk(objects, allOrNothing, retry++);
+			}
 		} finally {
 			op.close();
 		}
+		return null;
 	}
 
 	@Override
