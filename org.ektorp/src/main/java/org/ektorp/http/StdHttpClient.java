@@ -167,7 +167,8 @@ public class StdHttpClient implements HttpClient {
 				try {
 					System.out.println("ERROR :: connection error. Retrying "+retry+"/"+maxRetry+" in "+wait/1000+" seconds.");					
 					Thread.sleep(wait);
-					return executeRequest(request, useBackend, maxRetry++);
+					retry++;
+					return executeRequest(request, useBackend, retry);
 				} catch (InterruptedException e2) {
 					// TODO Auto-generated catch block
 					throw Exceptions.propagate(e2);
